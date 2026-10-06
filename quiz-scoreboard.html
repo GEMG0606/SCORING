@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Score Desk</title>
+<style>
+:root{--bg:#120a26;--card:#1e1440;--line:#3a2a73;--txt:#f4f0ff;--mut:#9d90cf;--first:#ff4fa3;--second:#22d3ee;--acc:#22d3ee;--p10:#8b5cf6;--p5:#2dd4bf;--m5:#fb923c}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+body{font-family:"Trebuchet MS",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(160deg,#120a26,#1a0f3d);min-height:100vh;color:var(--txt)}
+body.display{background:transparent;min-height:0}
+button{font:inherit;cursor:pointer;border:0;color:inherit}
+#ctl{max-width:480px;margin:auto;padding:12px;padding-top:max(12px,env(safe-area-inset-top))}
+.top{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--mut);margin-bottom:10px;letter-spacing:.06em}
+.live{color:var(--p5)}.live.off{color:var(--m5)}
+.seg{display:flex;gap:0;margin-bottom:10px;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{flex:1;padding:10px;background:transparent;font-weight:700;font-size:13px;color:var(--mut)}
+.seg button.on{background:var(--acc);color:#06222a}
+.nav{display:flex;gap:8px;margin-bottom:10px}
+.nav button{padding:16px;border-radius:16px;font-weight:900;font-size:18px;color:#fff}
+.nav .p{flex:1;background:var(--card);border:1px solid var(--line)}
+.nav .n{flex:2.4;background:linear-gradient(90deg,#8b5cf6,#ff4fa3)}
+.hint{text-align:center;font-size:10px;color:var(--mut);margin-bottom:10px}
+.row{display:flex;align-items:center;gap:8px;background:var(--card);border-left:5px solid var(--line);border-radius:6px 16px 16px 6px;padding:8px 10px;margin-bottom:7px}
+.row.r1{border-left-color:var(--first);background:#2a1450}.row.r2{border-left-color:var(--second)}
+.nm{flex:1;min-width:0;font-weight:700;font-size:14px}
+.nm small{display:inline-block;margin-left:6px;font-size:9px;padding:1px 6px;border-radius:999px;background:#3a2a73;color:#d9ccff}
+.sc{font-size:26px;font-weight:900;width:62px;text-align:right}
+.row.r1 .sc{color:var(--first)}.row.r2 .sc{color:var(--second)}
+.b{width:44px;height:44px;border-radius:50%;font-weight:800;font-size:13px;color:#fff}
+.b.g{background:var(--p10)}.b.l{background:var(--p5);color:#032b26}.b.m{background:var(--m5);color:#2b1000}
+details{margin-top:10px;background:var(--card);border-radius:14px;padding:10px;font-size:13px}
+summary{font-weight:700;color:var(--mut);font-size:11px;letter-spacing:.08em}
+details label{display:block;margin:8px 0 3px;color:var(--mut);font-size:11px}
+details input,details textarea{width:100%;padding:9px;border-radius:8px;border:1px solid var(--line);background:#120a26;color:#fff;font:inherit;font-size:13px}
+details .act{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+details .act button{padding:9px 12px;border-radius:999px;background:#3a2a73;font-weight:700;font-size:12px}
+details .act .dng{background:#7a1f4a}
+.links a{color:var(--acc);word-break:break-all;font-size:11px}
+#dsp{display:none;width:100%;padding:6px}
+body.display #ctl{display:none}body.display #dsp{display:flex;gap:10px}
+.tile{flex:1;min-width:0;background:linear-gradient(180deg,rgba(38,22,84,.95),rgba(24,12,56,.95));border:0;border-bottom:5px solid #4b3a8f;border-radius:16px 16px 6px 6px;padding:10px 4px 8px;text-align:center;transition:.3s}
+.tile .rk{display:inline-block;font-size:clamp(9px,1.1vw,14px);font-weight:800;padding:1px 9px;border-radius:999px;background:#4b3a8f;color:#e5dcff}
+.tile .tn{font-size:clamp(10px,1.3vw,18px);font-weight:700;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#d9ccff}
+.tile .ts{font-size:clamp(22px,3.6vw,56px);font-weight:900;line-height:1.1}
+.tile.r1{border-bottom-color:var(--first);box-shadow:0 0 22px rgba(255,79,163,.5)}.tile.r1 .ts{color:var(--first)}.tile.r1 .rk{background:var(--first);color:#2b0016}
+.tile.r2{border-bottom-color:var(--second)}.tile.r2 .ts{color:var(--second)}.tile.r2 .rk{background:var(--second);color:#06222a}
+.tile.bump{transform:translateY(-6px) scale(1.06)}
+</style></head>
+<body>
+<div id="ctl">
+ <div class="top"><span>✦ SCORE DESK · <span id="room"></span></span><span class="live" id="live">● LIVE</span></div>
+ <div class="seg"><button id="mPos">📌 Position</button><button id="mTop">🏆 Highest top</button></div>
+ <div class="nav"><button class="p" onclick="cmd('prev')">◀ PREV</button><button class="n" onclick="cmd('next')">NEXT ▶</button></div>
+ <div class="hint">slides — no clicker needed (needs slide-clicker.py running on the laptop)</div>
+ <div id="rows"></div>
+ <details><summary>⚙ SETUP (TEAMS · SYNC · RESET)</summary>
+  <label>Team names (one per line)</label><textarea id="names" rows="6"></textarea>
+  <div class="act"><button onclick="saveNames()">Apply names</button><button class="dng" onclick="resetScores()">Reset scores</button></div>
+  <label>Room code</label><input id="roomIn">
+  <div class="act"><button onclick="saveCfg()">Save room</button></div>
+  <label>Display link (paste in PPT web-viewer add-in / OBS browser source)</label>
+  <div class="links"><a id="dLink" href="#" target="_blank"></a></div>
+  <label>Undo</label><div class="act"><button onclick="undo()">↶ Undo last change</button></div>
+ </details>
+</div>
+<div id="dsp"></div>
+
+<script>
+const Q=new URLSearchParams(location.search);
+const MODE=Q.get('mode')==='display'?'display':'control';
+const LS=(k,v)=>v===undefined?localStorage.getItem(k):localStorage.setItem(k,v);
+let ROOM=Q.get('room')||LS('qs_room')||'quiz1';
+const DEF_URL='https://daeunvrbadtnpktxqyuo.supabase.co',DEF_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhZXVudnJiYWR0bnBrdHhxeXVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyODkzMDUsImV4cCI6MjEwNjg2NTMwNX0.Z8xkPWmArATWBqcck92_8sI6H498uMAOgs4aNG5NX4U';
+let SB={url:DEF_URL,key:DEF_KEY};
+const remote=()=>SB.url&&SB.key;
+const defNames=['Team 1','Team 2','Team 3','Team 4','Team 5','Team 6','Team 7','Team 8'];
+let S={teams:defNames.map(n=>({n,s:0})),mode:'pos',rev:0,cmd:'',seq:0};
+let hist=[];
+if(MODE==='display')document.body.classList.add('display');
+
+/* ---------- ranking (competition ranking: 190,170,170,170,160,160,90,45 -> 1,2,2,2,5,5,7,8) ---------- */
+function ranks(){const sorted=[...S.teams.map(t=>t.s)].sort((a,b)=>b-a);return S.teams.map(t=>sorted.indexOf(t.s)+1)}
+const ord=r=>r===1?'1ST':r===2?'2ND':r===3?'3RD':'#'+r;
+function cls(r){if(r===1)return'r1';if(r===2&&S.mode==='pos')return'r2';return''}
+
+/* ---------- storage / sync ---------- */
+const hdr=()=>({apikey:SB.key,Authorization:'Bearer '+SB.key,'Content-Type':'application/json'});
+async function push(){
+  S.rev=Date.now();
+  const body={room:ROOM,state:S,cmd:S.cmd,cmd_seq:S.seq,updated_at:new Date().toISOString()};
+  LS('qs_state_'+ROOM,JSON.stringify(S));
+  if(!remote())return setLive(true);
+  try{
+    const r=await fetch(SB.url+'/rest/v1/quiz_rooms?on_conflict=room',{method:'POST',headers:{...hdr(),Prefer:'resolution=merge-duplicates'},body:JSON.stringify(body)});
+    setLive(r.ok);
+  }catch(e){setLive(false)}
+}
+async function pull(){
+  try{
+    if(remote()){
+      const r=await fetch(SB.url+'/rest/v1/quiz_rooms?room=eq.'+encodeURIComponent(ROOM)+'&select=state',{headers:hdr()});
+      if(!r.ok)return setLive(false);
+      const j=await r.json();setLive(true);
+      if(j[0]&&j[0].state&&j[0].state.rev!==S.rev){S=j[0].state;render()}
+    }else{
+      const raw=LS('qs_state_'+ROOM);
+      if(raw){const o=JSON.parse(raw);if(o.rev!==S.rev){S=o;render()}}
+    }
+  }catch(e){setLive(false)}
+}
+function setLive(ok){const l=document.getElementById('live');if(!l)return;l.classList.toggle('off',!ok);l.textContent=ok?'● LIVE':'● OFFLINE'}
+
+/* ---------- controller actions ---------- */
+function snap(){hist.push(JSON.stringify(S));if(hist.length>50)hist.shift()}
+function add(i,d){snap();S.teams[i].s+=d;render();push()}
+function setMode(m){S.mode=m;render();push()}
+function cmd(a){S.cmd=a;S.seq++;push();if(navigator.vibrate)navigator.vibrate(30)}
+function undo(){if(!hist.length)return;S=JSON.parse(hist.pop());render();push()}
+function resetScores(){if(!confirm('Reset all scores to 0?'))return;snap();S.teams.forEach(t=>t.s=0);render();push()}
+function saveNames(){
+  const n=document.getElementById('names').value.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,12);
+  if(!n.length)return;snap();
+  S.teams=n.map((nm,i)=>({n:nm,s:S.teams[i]?S.teams[i].s:0}));render();push();
+}
+function saveCfg(){
+  ROOM=document.getElementById('roomIn').value.trim()||'quiz1';
+  LS('qs_room',ROOM);
+  render();push();
+}
+
+/* ---------- render ---------- */
+function render(){
+  const R=ranks();
+  if(MODE==='display'){
+    const d=document.getElementById('dsp');
+    const prev={};d.querySelectorAll('.tile').forEach((t,i)=>prev[i]=t.dataset.s);
+    d.innerHTML=S.teams.map((t,i)=>`<div class="tile ${cls(R[i])}" data-s="${t.s}"><span class="rk">${ord(R[i])}</span><div class="tn">${esc(t.n)}</div><div class="ts">${t.s}</div></div>`).join('');
+    d.querySelectorAll('.tile').forEach((t,i)=>{if(prev[i]!==undefined&&prev[i]!==t.dataset.s){t.classList.add('bump');setTimeout(()=>t.classList.remove('bump'),350)}});
+    return;
+  }
+  document.getElementById('room').textContent=ROOM;
+  document.getElementById('mPos').classList.toggle('on',S.mode==='pos');
+  document.getElementById('mTop').classList.toggle('on',S.mode==='top');
+  document.getElementById('rows').innerHTML=S.teams.map((t,i)=>`<div class="row ${cls(R[i])}"><div class="nm">${esc(t.n)}<small>${ord(R[i])}</small></div><div class="sc">${t.s}</div><button class="b g" onclick="add(${i},10)">+10</button><button class="b l" onclick="add(${i},5)">+5</button><button class="b m" onclick="add(${i},-5)">−5</button></div>`).join('');
+  const a=document.activeElement;
+  if(!a||a.id!=='names')document.getElementById('names').value=S.teams.map(t=>t.n).join('\n');
+  if(!a||a.tagName!=='INPUT'){roomIn.value=ROOM}
+  const u=location.origin&&location.origin!=='null'?location.origin+location.pathname:location.href.split('?')[0];
+  const link=u+'?mode=display&room='+encodeURIComponent(ROOM);
+  const dl=document.getElementById('dLink');dl.href=link;dl.textContent=link;
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+document.getElementById('mPos').onclick=()=>setMode('pos');
+document.getElementById('mTop').onclick=()=>setMode('top');
+
+/* init */
+(function(){
+  const raw=LS('qs_state_'+ROOM);if(raw){try{S=JSON.parse(raw)}catch(e){}}
+  render();
+  if(MODE==='control'){push()}
+  setInterval(()=>{if(MODE==='display')pull()},600);
+  window.addEventListener('storage',()=>{if(MODE==='display')pull()});
+  if(MODE==='display')pull();
+})();
+</script></body></html>

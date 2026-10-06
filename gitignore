@@ -1,0 +1,18 @@
+# Secrets / local config
+.env
+.env.*
+config.local.*
+*.local.html
+secrets.*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
