@@ -31,6 +31,10 @@ button{font:inherit;cursor:pointer;border:0;color:inherit}
 .b.g{background:linear-gradient(145deg,var(--blue),var(--deep));box-shadow:0 2px 10px rgba(47,128,237,.5)}
 .b.l{background:linear-gradient(145deg,#8fcbff,var(--sky));color:#02203f}
 .b.m{background:#101c33;border:1px solid #2c4574;color:#a9c4ee}
+.rbar{display:flex;justify-content:space-between;align-items:center;margin:2px 0 8px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:#050b17;font-weight:800;letter-spacing:.1em;font-size:12px;color:var(--sky)}
+.rbar button{padding:8px 14px;border-radius:999px;background:linear-gradient(90deg,var(--deep),var(--blue));font-weight:800;font-size:12px;color:#fff}
+.dl.d2{background:#0a1220;box-shadow:none;border-color:var(--line);color:#a9c4ee;font-size:13px;padding:11px}
+.dl{display:block;width:100%;margin-top:6px;padding:14px;border-radius:14px;font-weight:800;font-size:14px;color:#fff;background:linear-gradient(90deg,var(--deep),var(--blue));border:1px solid var(--sky);box-shadow:0 4px 18px rgba(47,128,237,.35)}
 details{margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px;font-size:13px}
 summary{font-weight:700;color:var(--mut);font-size:11px;letter-spacing:.08em}
 details label{display:block;margin:8px 0 3px;color:var(--mut);font-size:11px}
@@ -58,7 +62,10 @@ body.display #ctl{display:none}body.display #dsp{display:flex;gap:10px}
  <div class="seg"><button id="mPos">📌 Position</button><button id="mTop">🏆 Highest top</button></div>
  <div class="nav"><button class="p" onclick="cmd('prev')">◀ PREV</button><button class="n" onclick="cmd('next')">NEXT ▶</button></div>
  <div class="hint">tap a score for custom points · slides — no clicker needed (needs slide-clicker.py running on the laptop)</div>
+ <div class="rbar"><span id="rnd">ROUND 1</span><button onclick="endRound()">End round ✓</button></div>
  <div id="rows"></div>
+ <button class="dl" onclick="downloadCSV()">⬇ Download scores by round (CSV)</button>
+ <button class="dl d2" onclick="downloadLog()">⬇ Download full change log (CSV)</button>
  <details><summary>⚙ SETUP (TEAMS · SYNC · RESET)</summary>
   <label>Team names (one per line)</label><textarea id="names" rows="6"></textarea>
   <div class="act"><button onclick="saveNames()">Apply names</button><button class="dng" onclick="resetScores()">Reset scores</button></div>
@@ -80,7 +87,7 @@ const DEF_URL='https://daeunvrbadtnpktxqyuo.supabase.co',DEF_KEY='eyJhbGciOiJIUz
 let SB={url:DEF_URL,key:DEF_KEY};
 const remote=()=>SB.url&&SB.key;
 const defNames=['Team 1','Team 2','Team 3','Team 4','Team 5','Team 6','Team 7','Team 8'];
-let S={teams:defNames.map(n=>({n,s:0})),mode:'pos',rev:0,cmd:'',seq:0};
+let S={teams:defNames.map(n=>({n,s:0})),mode:'pos',rev:0,cmd:'',seq:0,round:1,marks:[],log:[]};
 let hist=[];
 if(MODE==='display')document.body.classList.add('display');
 
@@ -120,7 +127,12 @@ function setLive(ok){const l=document.getElementById('live');if(!l)return;l.clas
 function snap(){hist.push(JSON.stringify(S));if(hist.length>50)hist.shift()}
 const rnd=x=>Math.round(x*100)/100;
 const fmt=x=>Number.isInteger(x)?String(x):String(rnd(x));
-function add(i,d){snap();S.teams[i].s=rnd(S.teams[i].s+d);render();push()}
+function logc(i,d){S.log.push({t:Date.now(),r:S.round,n:S.teams[i].n,d:rnd(d),s:S.teams[i].s});if(S.log.length>3000)S.log.shift()}
+function add(i,d){snap();S.log=S.log||[];S.teams[i].s=rnd(S.teams[i].s+d);logc(i,d);render();push()}
+function endRound(){
+  if(!confirm('End Round '+S.round+' and start Round '+(S.round+1)+'?'))return;
+  snap();S.marks=S.marks||[];S.marks.push(S.teams.map(t=>t.s));S.round=(S.round||1)+1;render();push();
+}
 function custom(i){
   const t=S.teams[i];
   const v=prompt(t.n+' — current '+fmt(t.s)+'\n\nEnter points to add (e.g. 2.5 or -3).\nTo set an exact score, start with = (e.g. =75).','');
@@ -128,12 +140,44 @@ function custom(i){
   const s=v.trim();const exact=s[0]==='=';
   const n=parseFloat(exact?s.slice(1):s);
   if(isNaN(n))return alert('Not a valid number');
-  snap();t.s=rnd(exact?n:t.s+n);render();push();
+  snap();S.log=S.log||[];const old=t.s;t.s=rnd(exact?n:t.s+n);logc(i,t.s-old);render();push();
 }
 function setMode(m){S.mode=m;render();push()}
 function cmd(a){S.cmd=a;S.seq++;push();if(navigator.vibrate)navigator.vibrate(30)}
+const csvq=v=>'"'+String(v).replace(/"/g,'""')+'"';
+function saveCSV(tag,lines){
+  const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  const name='quiz-'+tag+'-'+ROOM+'-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+'.csv';
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function downloadCSV(){
+  const R=ranks(),marks=S.marks||[];
+  const cur=S.teams.map(t=>t.s);
+  const last=marks.length?marks[marks.length-1]:S.teams.map(()=>0);
+  const inProg=cur.some((v,i)=>v!==(last[i]||0))||!marks.length;
+  const snaps=marks.concat(inProg?[cur]:[]);
+  const head=['Rank','Team'];
+  snaps.forEach((_,k)=>head.push('Round '+(k+1)+(k===marks.length?' (current)':'')+' pts'));
+  head.push('Total');
+  const rows=S.teams.map((t,i)=>{
+    const pts=snaps.map((sn,k)=>rnd((sn[i]||0)-(k?(snaps[k-1][i]||0):0)));
+    return {r:R[i],n:t.n,pts,tot:t.s};
+  }).sort((a,b)=>a.r-b.r||a.n.localeCompare(b.n));
+  const lines=[head.map(csvq).join(',')].concat(rows.map(x=>[x.r,csvq(x.n)].concat(x.pts.map(fmt),[fmt(x.tot)]).join(',')));
+  saveCSV('scores',lines);
+}
+function downloadLog(){
+  const lines=['Time,Round,Team,Change,Total after'].concat((S.log||[]).map(e=>{
+    const d=new Date(e.t),p=n=>String(n).padStart(2,'0');
+    const ts=d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+    return [ts,e.r,csvq(e.n),(e.d>0?'+':'')+fmt(e.d),fmt(e.s)].join(',');
+  }));
+  saveCSV('changelog',lines);
+}
 function undo(){if(!hist.length)return;S=JSON.parse(hist.pop());render();push()}
-function resetScores(){if(!confirm('Reset all scores to 0?'))return;snap();S.teams.forEach(t=>t.s=0);render();push()}
+function resetScores(){if(!confirm('Reset all scores, rounds and the change log?'))return;snap();S.teams.forEach(t=>t.s=0);S.marks=[];S.log=[];S.round=1;render();push()}
 function saveNames(){
   const n=document.getElementById('names').value.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,12);
   if(!n.length)return;snap();
@@ -147,6 +191,7 @@ function saveCfg(){
 
 /* ---------- render ---------- */
 function render(){
+  S.round=S.round||1;S.marks=S.marks||[];S.log=S.log||[];
   const R=ranks();
   if(MODE==='display'){
     const d=document.getElementById('dsp');
@@ -156,6 +201,7 @@ function render(){
     return;
   }
   document.getElementById('room').textContent=ROOM;
+  document.getElementById('rnd').textContent='ROUND '+S.round;
   document.getElementById('mPos').classList.toggle('on',S.mode==='pos');
   document.getElementById('mTop').classList.toggle('on',S.mode==='top');
   document.getElementById('rows').innerHTML=S.teams.map((t,i)=>`<div class="row ${cls(R[i])}"><div class="nm">${esc(t.n)}<small>${ord(R[i])}</small></div><div class="sc" onclick="custom(${i})" title="Tap for custom score">${fmt(t.s)}</div><button class="b g" onclick="add(${i},10)">+10</button><button class="b l" onclick="add(${i},1)">+1</button><button class="b l h" onclick="add(${i},0.5)">+0.5</button><button class="b m" onclick="add(${i},-5)">−5</button></div>`).join('');
